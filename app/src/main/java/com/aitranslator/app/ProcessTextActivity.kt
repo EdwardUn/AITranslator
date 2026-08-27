@@ -10,14 +10,23 @@ class ProcessTextActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val text = intent
-            .getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
-            ?.toString().orEmpty()
+        val text = when (intent.action) {
+            Intent.ACTION_PROCESS_TEXT ->
+                intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
+                    ?.toString().orEmpty()
 
-        val readOnly = intent.getBooleanExtra(
-            Intent.EXTRA_PROCESS_TEXT_READONLY,
-            false
-        )
+            Intent.ACTION_SEND ->
+                intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+
+            else -> ""
+        }
+
+        val readOnly =
+            intent.action != Intent.ACTION_PROCESS_TEXT ||
+            intent.getBooleanExtra(
+                Intent.EXTRA_PROCESS_TEXT_READONLY,
+                false
+            )
 
         val russian = text.any {
             it in 'А'..'я' || it == 'Ё' || it == 'ё'
@@ -31,12 +40,11 @@ class ProcessTextActivity : Activity() {
 
         AlertDialog.Builder(this)
             .setTitle("AI Translator")
-            .setMessage(
-                "$text\n\n→\n\n$result"
-            )
+            .setMessage("$text\n\n→\n\n$result")
             .setPositiveButton(
-                if (readOnly) "Готово" else "Заменить"
+                if (readOnly) "Скопировать перевод" else "Заменить"
             ) { _, _ ->
+
                 if (!readOnly) {
                     setResult(
                         RESULT_OK,
@@ -45,13 +53,27 @@ class ProcessTextActivity : Activity() {
                             result
                         )
                     )
+                } else {
+                    val clipboard =
+                        getSystemService(CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+
+                    clipboard.setPrimaryClip(
+                        android.content.ClipData.newPlainText(
+                            "AI Translator",
+                            result
+                        )
+                    )
                 }
+
                 finish()
             }
             .setNegativeButton("Отмена") { _, _ ->
                 finish()
             }
-            .setOnCancelListener { finish() }
+            .setOnCancelListener {
+                finish()
+            }
             .show()
     }
 }
